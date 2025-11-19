@@ -125,6 +125,26 @@ def main():
         print("Warning: Could not retrieve device info. Using defaults.")
         device_info = {'platformVersion': '11.0', 'model': 'Android Device'}
     
+    # Ask for number of heroes
+    print("\nHero Configuration:")
+    print("Available heroes: 1=King, 2=King+Queen, 3=King+Queen+Warden, 4=All (King+Queen+Warden+Champion)")
+    hero_count_input = input("Number of heroes available (1-4, default 4): ").strip()
+    if hero_count_input:
+        try:
+            hero_count = int(hero_count_input)
+            if hero_count < 1 or hero_count > 4:
+                print("Invalid input. Using default: 4 heroes.")
+                hero_count = 4
+            else:
+                hero_names = ["King", "King+Queen", "King+Queen+Warden", "All (King+Queen+Warden+Champion)"]
+                print(f"✓ Configured for {hero_count} hero(s): {hero_names[hero_count-1]}")
+        except ValueError:
+            print("Invalid input. Using default: 4 heroes.")
+            hero_count = 4
+    else:
+        hero_count = 4
+        print("Using default: 4 heroes (all available).")
+    
     # Ask for number of attacks
     print("\nAttack Configuration:")
     num_attacks_input = input("Number of attacks (Enter for infinite loop, or number): ").strip()
@@ -150,11 +170,12 @@ def main():
         print("\n" + "="*60)
         print("READY TO START AUTOMATED ATTACKS")
         print("="*60)
+        print(f"Hero Configuration: {hero_count} hero(s)")
         print("\nMake sure you're on the home screen.")
         input("Press Enter when ready to start attacks...")
         
-        # Run automated attacks
-        run_automated_attacks(driver, num_attacks=num_attacks)
+        # Run automated attacks with hero count
+        run_automated_attacks(driver, num_attacks=num_attacks, hero_count=hero_count)
     
     except KeyboardInterrupt:
         print("\n\nInterrupted by user.")
