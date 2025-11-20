@@ -8,12 +8,29 @@ import time
 import random
 import re
 import io
-from PIL import Image
+import os
+from datetime import datetime
+import numpy as np
+from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
+try:
+    import easyocr
+    EASYOCR_AVAILABLE = True
+    EASYOCR_READER = None  # Lazy initialization on first use
+except ImportError:
+    EASYOCR_AVAILABLE = False
+    EASYOCR_READER = None
+    print("Note: EasyOCR not installed. Using pytesseract. For better accuracy, install: pip install easyocr")
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.common.actions.pointer_input import PointerInput
+
+# Directory for storing captured images
+CAPTURED_IMAGES_DIR = "captured_images"
+
+# Create directory if it doesn't exist
+os.makedirs(CAPTURED_IMAGES_DIR, exist_ok=True)
 
 
 def check_session_alive(driver):
@@ -58,66 +75,223 @@ def tap_with_deviation(driver, base_x, base_y, deviation=2, duration=0.1, max_re
     tap_at_location(driver, x, y, duration, max_retries=max_retries)
 
 
+def preprocess_image_for_ocr(img):
+    """
+    Enhance image for better OCR accuracy.
+    Applies: grayscale, contrast enhancement, sharpening, and thresholding.
+    """
+    # Convert to grayscale for better OCR
+    if img.mode != 'L':
+        img = img.convert('L')
+    
+    # Enhance contrast
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(2.0)  # Increase contrast by 2x
+    
+    # Enhance sharpness
+    enhancer = ImageEnhance.Sharpness(img)
+    img = enhancer.enhance(2.0)  # Increase sharpness by 2x
+    
+    # Apply threshold to make text more distinct (convert to binary)
+    # Convert PIL Image to numpy array for thresholding
+    img_array = np.array(img)
+    # Use adaptive thresholding - better for varying lighting
+    threshold_value = np.mean(img_array)
+    img_array = np.where(img_array > threshold_value, 255, 0).astype(np.uint8)
+    img = Image.fromarray(img_array)
+    
+    # Apply slight blur to reduce noise
+    img = img.filter(ImageFilter.MedianFilter(size=3))
+    
+    return img
+
+
+def extract_with_easyocr(cropped_img):
+    """Extract text using EasyOCR (more accurate)."""
+    global EASYOCR_READER
+    
+    if not EASYOCR_AVAILABLE:
+        return None
+    
+    try:
+        # Lazy initialization - initialize reader on first use (it's expensive)
+        if EASYOCR_READER is None:
+            print("Initializing EasyOCR reader (first time, may take a moment)...")
+            import easyocr
+            EASYOCR_READER = easyocr.Reader(['en'], gpu=False)
+            print("EasyOCR initialized successfully!")
+        
+        # Convert PIL image to numpy array
+        img_array = np.array(cropped_img)
+        
+        # Perform OCR with allowlist (numbers, comma, and space)
+        results = EASYOCR_READER.readtext(img_array, allowlist='0123456789, ')
+        
+        # Extract text from results (result format: (bbox, text, confidence))
+        ocr_text = ' '.join([result[1] for result in results])
+        return ocr_text
+    except Exception as e:
+        print(f"EasyOCR error: {e}")
+        return None
+
+
+def extract_with_pytesseract(cropped_img):
+    """Extract text using pytesseract with improved config."""
+    try:
+        # Try multiple PSM modes for better accuracy (allow numbers, comma, and space)
+        configs = [
+            '--psm 6 -c tessedit_char_whitelist=0123456789, ',  # Uniform block of text
+            '--psm 7 -c tessedit_char_whitelist=0123456789, ',  # Single text line
+            '--psm 8 -c tessedit_char_whitelist=0123456789, ',  # Single word
+            '--psm 11 -c tessedit_char_whitelist=0123456789, ', # Sparse text
+        ]
+        
+        best_text = ""
+        best_confidence = 0
+        
+        for config in configs:
+            try:
+                # Get detailed data with confidence scores
+                data = pytesseract.image_to_data(cropped_img, config=config, output_type=pytesseract.Output.DICT)
+                
+                # Calculate average confidence
+                confidences = [int(conf) for conf in data['conf'] if int(conf) > 0]
+                if confidences:
+                    avg_confidence = sum(confidences) / len(confidences)
+                    if avg_confidence > best_confidence:
+                        best_confidence = avg_confidence
+                        # Extract text
+                        text_parts = [text for text in data['text'] if text.strip()]
+                        best_text = ' '.join(text_parts)
+            except:
+                continue
+        
+        # Fallback to simple method if detailed data fails
+        if not best_text:
+            best_text = pytesseract.image_to_string(cropped_img, config='--psm 6 -c tessedit_char_whitelist=0123456789, ')
+        
+        return best_text.strip()
+    except Exception as e:
+        print(f"pytesseract error: {e}")
+        return None
+
+
+def extract_number_from_region(img, region_name, left, top, right, bottom):
+    """
+    Extract a number from a specific region of the image.
+    Handles numbers with spaces and commas (e.g., "1,234,567" or "1 234 567" or "1,234 567").
+    
+    Args:
+        img: PIL Image object
+        region_name: Name of the region (for logging)
+        left, top, right, bottom: Region coordinates
+    
+    Returns:
+        Extracted number string (with spaces and commas removed) or None
+    """
+    # Crop to specific region
+    cropped = img.crop((left, top, right, bottom))
+    
+    # Preprocess image for better OCR accuracy
+    processed_img = preprocess_image_for_ocr(cropped)
+    
+    # Try EasyOCR first (more accurate), fallback to pytesseract
+    ocr_text = None
+    
+    if EASYOCR_AVAILABLE:
+        ocr_text = extract_with_easyocr(processed_img)
+    
+    # Fallback to pytesseract if EasyOCR failed or not available
+    if not ocr_text:
+        ocr_text = extract_with_pytesseract(processed_img)
+    
+    if not ocr_text:
+        print(f"  Warning: OCR returned no text for {region_name}")
+        return None
+    
+    # Clean OCR text
+    ocr_text = ocr_text.strip()
+    print(f"  {region_name} OCR Raw Text: {ocr_text}")
+    
+    # Extract numbers - look for numbers that may contain spaces and/or commas
+    # Pattern matches: digits, spaces, and commas together (e.g., "1,234,567", "1 234 567", "1,234 567")
+    # This regex finds sequences of digits with optional spaces and commas between them
+    numbers = re.findall(r'[\d\s,]+', ocr_text)
+    
+    # Clean each number: remove spaces and commas, keep only digits
+    cleaned_numbers = []
+    for num_str in numbers:
+        # Remove all spaces and commas, keep only digits
+        cleaned = re.sub(r'[\s,]+', '', num_str)
+        # Require at least 4 digits to filter out noise
+        if len(cleaned) >= 4:
+            cleaned_numbers.append(cleaned)
+    
+    if cleaned_numbers:
+        # Return the first/largest number found (already cleaned of spaces and commas)
+        return cleaned_numbers[0]
+    
+    return None
+
+
 def extract_resources_from_screenshot(driver):
     """
-    Take screenshot of resource region and extract gold, elixir, dark elixir values.
-    Region: x 100-400, y 140-400
+    Take screenshot and extract gold, elixir, dark elixir values from specific regions.
+    
+    Regions:
+    - Gold: x 165-380, y 145-200
+    - Elixir: x 165-380, y 200-250
+    
+    Uses improved OCR with image preprocessing and EasyOCR as primary method.
     Returns: (gold, elixir, dark_elixir) or (None, None, None) if failed
     """
     try:
-        print("Taking screenshot of resource region...")
+        print("Taking screenshot of resource regions...")
         # Take full screenshot
         screenshot_path = driver.get_screenshot_as_png()
         
         # Open image with PIL
         img = Image.open(io.BytesIO(screenshot_path))
         
-        # Crop to resource region: x 100-400, y 140-400
-        # PIL uses (left, top, right, bottom) format
-        cropped = img.crop((100, 140, 400, 400))
+        # Save timestamp for image files
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
         
-        # Save cropped image for debugging (optional)
-        # cropped.save("resource_region.png")
+        # Extract Gold from specific region: x 165-380, y 145-200
+        print("\nExtracting Gold from region (x: 165-380, y: 145-200)...")
+        gold_cropped = img.crop((165, 145, 380, 200))
+        gold_processed = preprocess_image_for_ocr(gold_cropped)
         
-        # Perform OCR
-        print("Performing OCR on resource region...")
-        ocr_text = pytesseract.image_to_string(cropped, config='--psm 6 -c tessedit_char_whitelist=0123456789,')
+        # Save gold images
+        gold_original_path = os.path.join(CAPTURED_IMAGES_DIR, f"gold_original_{timestamp}.png")
+        gold_processed_path = os.path.join(CAPTURED_IMAGES_DIR, f"gold_processed_{timestamp}.png")
+        gold_cropped.save(gold_original_path)
+        gold_processed.save(gold_processed_path)
+        print(f"  Saved gold images: {gold_original_path}, {gold_processed_path}")
         
-        # Clean OCR text
-        ocr_text = ocr_text.strip()
-        print(f"OCR Raw Text: {ocr_text}")
+        gold = extract_number_from_region(img, "Gold", 165, 145, 380, 200)
         
-        # Extract numbers - look for comma-separated numbers
-        # Pattern: numbers with commas (e.g., "1,234,567")
-        numbers = re.findall(r'[\d,]+', ocr_text)
+        # Extract Elixir from specific region: x 165-380, y 200-250
+        print("\nExtracting Elixir from region (x: 165-380, y: 200-250)...")
+        elixir_cropped = img.crop((165, 200, 380, 250))
+        elixir_processed = preprocess_image_for_ocr(elixir_cropped)
         
-        # Filter out very short numbers (likely noise)
-        numbers = [n for n in numbers if len(n.replace(',', '')) >= 3]
+        # Save elixir images
+        elixir_original_path = os.path.join(CAPTURED_IMAGES_DIR, f"elixir_original_{timestamp}.png")
+        elixir_processed_path = os.path.join(CAPTURED_IMAGES_DIR, f"elixir_processed_{timestamp}.png")
+        elixir_cropped.save(elixir_original_path)
+        elixir_processed.save(elixir_processed_path)
+        print(f"  Saved elixir images: {elixir_original_path}, {elixir_processed_path}")
         
-        print(f"Extracted numbers: {numbers}")
+        elixir = extract_number_from_region(img, "Elixir", 165, 200, 380, 250)
         
-        if len(numbers) >= 3:
-            # First is gold, second is elixir, last is dark elixir
-            gold = numbers[0].replace(',', '')
-            elixir = numbers[1].replace(',', '')
-            dark_elixir = numbers[-1].replace(',', '')  # Last one
-            
-            return (gold, elixir, dark_elixir)
-        elif len(numbers) == 2:
-            # Only gold and elixir found
-            gold = numbers[0].replace(',', '')
-            elixir = numbers[1].replace(',', '')
-            dark_elixir = "0"
-            return (gold, elixir, dark_elixir)
-        elif len(numbers) == 1:
-            # Only one value found
-            gold = numbers[0].replace(',', '')
-            elixir = "0"
-            dark_elixir = "0"
-            return (gold, elixir, dark_elixir)
-        else:
-            print("Warning: Could not extract resource values from OCR")
-            return (None, None, None)
+        # Dark Elixir extraction (if needed in future, can be added here)
+        dark_elixir = None
+        
+        print(f"\nExtracted values:")
+        print(f"  Gold: {gold if gold else 'Not found'}")
+        print(f"  Elixir: {elixir if elixir else 'Not found'}")
+        
+        return (gold, elixir, dark_elixir)
             
     except Exception as e:
         print(f"Error extracting resources: {e}")
@@ -407,9 +581,9 @@ def place_goblins(driver, count=106):
         num_goblins = goblins_per_location + (1 if i < remaining_goblins else 0)
         
         for _ in range(num_goblins):
-            # Place with 2-2 point deviation (as specified) - very fast
+            # Place with 2-2 point deviation (as specified) - no delay between placements
             tap_with_deviation(driver, location[0], location[1], deviation=2)
-            time.sleep(0.001)  # Very fast placement - almost instant
+            # No sleep - deploy all 106 goblins as fast as possible
     
     print(f"  Placed {count} goblins across {len(goblin_locations)} locations")
 
@@ -516,8 +690,15 @@ def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4):
         print("-"*60)
         gold, elixir, dark_elixir = extract_resources_from_screenshot(driver)
         
-        # Resource threshold: 10L = 1,000,000 (attack if BOTH Gold AND Elixir >= 10L)
-        RESOURCE_THRESHOLD = 1000000
+        # Dynamic resource threshold:
+        # - First 4 attempts: 9L (900,000) - higher threshold
+        # - From attempt 5 onwards: 5L (500,000) - lower threshold
+        if search_attempts < 5:
+            RESOURCE_THRESHOLD = 900000  # 9L (9 lakhs) for first 4 attempts
+            threshold_label = "9L"
+        else:
+            RESOURCE_THRESHOLD = 500000  # 5L (5 lakhs) from attempt 5 onwards
+            threshold_label = "5L"
         
         if gold and elixir:
             try:
@@ -529,7 +710,7 @@ def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4):
                 if dark_elixir:
                     print(f"Dark Elixir: {dark_elixir}")
                 
-                print(f"\nThreshold Check: Need Gold >= {RESOURCE_THRESHOLD:,} AND Elixir >= {RESOURCE_THRESHOLD:,}")
+                print(f"\nThreshold Check (Attempt {search_attempts}): Need Gold >= {RESOURCE_THRESHOLD:,} ({threshold_label}) AND Elixir >= {RESOURCE_THRESHOLD:,} ({threshold_label})")
                 
                 # Check if BOTH resources meet threshold (AND condition)
                 if gold_value >= RESOURCE_THRESHOLD and elixir_value >= RESOURCE_THRESHOLD:
