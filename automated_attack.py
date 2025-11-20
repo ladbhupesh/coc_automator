@@ -313,6 +313,17 @@ def click_find_match(driver):
     tap_at_location(driver, 431, 809)
     time.sleep(0.5)  # Reduced from 2s
 
+def click_add_reinforcements(driver):
+    """Click Add Reinforcements button."""
+    print("Clicking Add Reinforcements...")
+    tap_at_location(driver, 1870, 875)  # Example coordinates, adjust as needed
+    time.sleep(0.5)  # Reduced from 2s
+
+def click_confirm_reinforcements(driver):
+    """Click Confirm Reinforcements button."""
+    print("Clicking Confirm Reinforcements...")
+    tap_at_location(driver, 1440, 800)  # Example coordinates, adjust as needed
+    time.sleep(0.5)  # Reduced from 2s
 
 def click_start_attack(driver):
     """Click Start Attack button."""
@@ -646,7 +657,7 @@ def click_return_home(driver):
     time.sleep(1)  # Reduced from 2s
 
 
-def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4):
+def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4, add_reinforcements=False):
     """
     Execute one complete attack sequence.
     Will search for matches until resources meet threshold or max attempts reached.
@@ -674,6 +685,9 @@ def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4):
         if search_attempts == 1:
             click_attack(driver)
             click_find_match(driver)
+            if add_reinforcements:
+                click_add_reinforcements(driver)
+                click_confirm_reinforcements(driver)
             click_start_attack(driver)
         
         # Step 2: Wait 10 seconds (or less if searching)
@@ -876,7 +890,7 @@ def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4):
     return False
 
 
-def main_loop(driver, num_attacks=None, hero_count=4):
+def main_loop(driver, num_attacks=None, hero_count=4, add_reinforcements = False):
     """
     Main loop to repeat attack sequence.
     
@@ -904,7 +918,7 @@ def main_loop(driver, num_attacks=None, hero_count=4):
             print(f"{'='*60}")
             
             try:
-                execute_attack_sequence(driver, hero_count=hero_count)
+                execute_attack_sequence(driver, hero_count=hero_count, add_reinforcements=add_reinforcements)
                 
                 # Wait a bit before next attack
                 print("Waiting before next attack...")
@@ -978,7 +992,7 @@ def main_loop(driver, num_attacks=None, hero_count=4):
 
 
 # Example usage function that needs to be called with a driver instance
-def run_automated_attacks(driver, num_attacks=None, hero_count=4):
+def run_automated_attacks(driver, num_attacks=None, hero_count=4, add_reinforcements = False):
     """
     Run automated attacks.
     
@@ -991,7 +1005,7 @@ def run_automated_attacks(driver, num_attacks=None, hero_count=4):
                     3 = King, Queen, Warden
                     4 = King, Queen, Warden, Champion
     """
-    main_loop(driver, num_attacks, hero_count=hero_count)
+    main_loop(driver, num_attacks, hero_count=hero_count, add_reinforcements=add_reinforcements)
 
 
 if __name__ == "__main__":

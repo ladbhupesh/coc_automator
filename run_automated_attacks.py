@@ -158,6 +158,14 @@ def main():
     else:
         num_attacks = None
         print("Will run infinite loop (Ctrl+C to stop).")
+
+    # Ask if reinforcements should be added
+    add_reinforcements_input = input("Add reinforcements before each attack? (y/n, default n): ").strip().lower()
+    add_reinforcements = add_reinforcements_input == 'y'
+    if add_reinforcements:
+        print("✓ Will add reinforcements before each attack.")
+    else:
+        print("Will not add reinforcements before attacks.")
     
     # Create driver
     driver = None
@@ -175,7 +183,7 @@ def main():
         input("Press Enter when ready to start attacks...")
         
         # Run automated attacks with hero count
-        run_automated_attacks(driver, num_attacks=num_attacks, hero_count=hero_count)
+        run_automated_attacks(driver, num_attacks=num_attacks, hero_count=hero_count, add_reinforcements=add_reinforcements)
     
     except KeyboardInterrupt:
         print("\n\nInterrupted by user.")
