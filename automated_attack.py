@@ -794,10 +794,10 @@ def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4, add_re
         place_goblins(driver, count=106)
         time.sleep(0.1)
         
-        # Step 6: Wait 1 minute after last placement (goblins)
-        print("Waiting 1 minute after all placements...")
+        # Step 6: Wait 1 seconds after last placement (goblins)
+        print("Waiting 30 seconds after all placements...")
         # Check session periodically during wait
-        wait_time = 60  # 1 minute = 60 seconds
+        wait_time = 30  # 30 seconds
         check_interval = 10  # Check every 10 seconds
         elapsed = 0
         while elapsed < wait_time:
