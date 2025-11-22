@@ -53,4 +53,4 @@ echo ""
 # --relaxed-security allows some operations that might otherwise fail
 # --use-plugins inspector activates the built-in inspector plugin
 # This helps with hidden API policy errors on Android 10+ devices
-exec appium --relaxed-security --use-plugins inspector
+exec appium --relaxed-security --use-plugins inspector,execute-driver,universal-xml,images,relaxed-caps,storage

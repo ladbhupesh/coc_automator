@@ -229,7 +229,14 @@ def extract_number_from_region(img, region_name, left, top, right, bottom):
     
     if cleaned_numbers:
         # Return the first/largest number found (already cleaned of spaces and commas)
-        return cleaned_numbers[0]
+        first_num = cleaned_numbers[0]
+        # If OCR produced a leading zero (e.g., '01234'), prepend '1' to correct
+        # common OCR misreads where leading digit is dropped or replaced by 0.
+        if first_num.startswith('0'):
+            corrected = '1' + first_num
+            print(f"  Note: {region_name} detected leading zero, corrected to: {corrected}")
+            return corrected
+        return first_num
     
     return None
 
@@ -410,8 +417,8 @@ def place_jump_spell(driver, hero_count=4):
     
     # PLACE jump spell at 3 locations on board with 2-3 point deviation
     jump_locations = [
-        (466, 372),
-        (1681, 159),
+        (760, 260),
+        (1620, 230),
         (1572, 706)
     ]
     print(f"  Placing jump spell at 3 locations on board...")
@@ -707,12 +714,15 @@ def execute_attack_sequence(driver, max_search_attempts=10, hero_count=4, add_re
         # Dynamic resource threshold:
         # - First 4 attempts: 9L (900,000) - higher threshold
         # - From attempt 5 onwards: 5L (500,000) - lower threshold
-        if search_attempts < 5:
-            RESOURCE_THRESHOLD = 900000  # 9L (9 lakhs) for first 4 attempts
-            threshold_label = "9L"
-        else:
-            RESOURCE_THRESHOLD = 500000  # 5L (5 lakhs) from attempt 5 onwards
-            threshold_label = "5L"
+        # if search_attempts < 5:
+        #     RESOURCE_THRESHOLD = 900000  # 9L (9 lakhs) for first 4 attempts
+        #     threshold_label = "9L"
+        # else:
+        #     RESOURCE_THRESHOLD = 500000  # 5L (5 lakhs) from attempt 5 onwards
+        #     threshold_label = "5L"
+        
+        RESOURCE_THRESHOLD = 500000  # 5L (5 lakhs)
+        threshold_label = "5L"
         
         if gold and elixir:
             try:
