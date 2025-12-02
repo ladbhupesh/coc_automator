@@ -417,8 +417,8 @@ def place_jump_spell(driver, hero_count=4):
     
     # PLACE jump spell at 3 locations on board with 2-3 point deviation
     jump_locations = [
-        (760, 260),
-        (1620, 230),
+        (800, 250),
+        (1565, 250),
         (1572, 706)
     ]
     print(f"  Placing jump spell at 3 locations on board...")
