@@ -49,7 +49,7 @@ def setup_android_sdk_env():
 
 
 def get_adb_devices():
-    """Get list of connected ADB devices."""
+    """Get list of connected ADB device id strings (never a single concatenated str)."""
     try:
         result = subprocess.run(
             ['adb', 'devices'],
@@ -58,11 +58,12 @@ def get_adb_devices():
             check=True
         )
         lines = result.stdout.strip().split('\n')[1:]  # Skip header
-        devices = []
+        devices: list[str] = []
         for line in lines:
             if line.strip() and '\tdevice' in line:
-                device_id = line.split('\t')[0]
-                devices.append(device_id)
+                device_id = line.split('\t')[0].strip()
+                if device_id:
+                    devices.append(device_id)
         return devices
     except subprocess.CalledProcessError as e:
         print(f"Error running adb devices: {e}")

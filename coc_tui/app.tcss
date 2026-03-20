@@ -1,0 +1,197 @@
+/* Agent-style shell (Claude Code / Codex–inspired): rail + workspace + hint bar */
+
+$agent-bg: #0c0c0c;
+$agent-panel: #111111;
+$agent-rail: #080808;
+$agent-border: #2a2a2a;
+$agent-muted: #6b6b6b;
+$agent-fg: #e4e4e4;
+$agent-accent: #c9a87c;
+$agent-dim: #4a4a4a;
+
+App {
+    background: $agent-bg;
+    color: $agent-fg;
+}
+
+Screen {
+    background: $agent-bg;
+}
+
+/* ─── Top chrome ───────────────────────────────────────── */
+.chrome-top {
+    layout: horizontal;
+    width: 100%;
+    height: 1;
+    background: $agent-panel;
+    color: $agent-muted;
+    padding: 0 2;
+    border-bottom: solid $agent-border;
+    text-style: none;
+}
+
+.chrome-top .accent {
+    color: $agent-accent;
+    text-style: bold;
+}
+
+/* ─── Bottom hint bar (Codex-style ^ shortcuts) ─────────── */
+.chrome-bottom {
+    dock: bottom;
+    height: 1;
+    background: $agent-panel;
+    color: $agent-dim;
+    padding: 0 2;
+    border-top: solid $agent-border;
+    text-style: none;
+}
+
+.chrome-bottom .key {
+    color: $agent-accent;
+    text-style: bold;
+}
+
+/* ─── Shell row: rail | main ───────────────────────────── */
+#shell-row {
+    height: 1fr;
+    width: 100%;
+}
+
+#sidebar-rail {
+    width: 28;
+    min-width: 28;
+    max-width: 28;
+    background: $agent-rail;
+    border-right: solid $agent-border;
+    padding: 1 2;
+    height: 1fr;
+}
+
+#sidebar-rail Static {
+    color: $agent-muted;
+}
+
+#sidebar-rail .brand {
+    color: $agent-accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#sidebar-rail .rail-title {
+    color: $agent-dim;
+    text-style: bold;
+    margin-top: 1;
+    margin-bottom: 0;
+}
+
+#sidebar-rail .rail-line {
+    margin-top: 0;
+    color: $agent-border;
+}
+
+#sidebar-rail .session-ok {
+    color: #7cb97c;
+}
+
+#sidebar-rail .session-warn {
+    color: #c9a87c;
+}
+
+#sidebar-rail .session-idle {
+    color: $agent-muted;
+}
+
+#main-workspace {
+    width: 1fr;
+    height: 1fr;
+    background: $agent-bg;
+    padding: 1 2;
+}
+
+/* ─── Setup form ─────────────────────────────────────────── */
+#setup-scroll {
+    height: 1fr;
+    padding: 0 1 1 0;
+}
+
+#setup-scroll .panel-title {
+    text-style: bold;
+    color: $agent-fg;
+    margin-bottom: 1;
+}
+
+#setup-scroll .panel-desc {
+    color: $agent-muted;
+    margin-bottom: 2;
+}
+
+.section-label {
+    margin-top: 1;
+    color: $agent-accent;
+    text-style: bold;
+}
+
+#status-line {
+    min-height: 3;
+    padding: 1;
+    background: $agent-panel;
+    border: solid $agent-border;
+    margin: 1 0;
+    color: $agent-fg;
+}
+
+#action-row {
+    height: auto;
+    margin-top: 1;
+    align: left middle;
+}
+
+#action-row Button {
+    margin: 0 1 0 0;
+    min-width: 16;
+}
+
+Input, Select {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+Switch {
+    margin-left: 2;
+}
+
+/* ─── Run / log view ─────────────────────────────────────── */
+#run-hint {
+    color: $agent-muted;
+    margin-bottom: 1;
+    height: auto;
+}
+
+#log-panel {
+    height: 1fr;
+    border: solid $agent-border;
+    background: $agent-panel;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+#log-panel RichLog {
+    height: 1fr;
+    background: $agent-panel;
+    color: $agent-fg;
+}
+
+#run-actions {
+    height: auto;
+    align: left middle;
+}
+
+#run-actions Button {
+    margin: 0 1 0 0;
+    min-width: 18;
+}
+
+/* Mute default widget chrome where possible */
+Button:focus {
+    border: tall $agent-accent;
+}

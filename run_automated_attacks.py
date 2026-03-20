@@ -20,17 +20,24 @@ from appium_inspector import (
 )
 
 
-def create_driver(device_id, device_info):
-    """Create Appium WebDriver."""
+def create_driver(device_id, device_info, *, allow_missing_app=False):
+    """Create Appium WebDriver.
+
+    Args:
+        allow_missing_app: If True, skip interactive prompt when CoC is not detected (for TUI / automation).
+    """
     package_name = get_clash_of_clans_package()
     
     # Check if app is installed
     if not check_app_installed(device_id, package_name):
         print(f"Warning: {package_name} not found on device.")
         print("Please install Clash of Clans on your device first.")
-        response = input("Continue anyway? (y/n): ")
-        if response.lower() != 'y':
-            sys.exit(1)
+        if allow_missing_app:
+            print("Continuing anyway (allow_missing_app=True).")
+        else:
+            response = input("Continue anyway? (y/n): ")
+            if response.lower() != 'y':
+                raise RuntimeError("Aborted: CoC not installed or user declined.")
 
     # Detect main activity
     print(f"Detecting main activity for {package_name}...")
@@ -202,4 +209,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--tui" in sys.argv:
+        from coc_tui.app import run_tui
+
+        run_tui()
+    else:
+        main()

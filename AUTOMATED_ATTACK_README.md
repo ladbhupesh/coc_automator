@@ -9,6 +9,11 @@ This script automates the attack sequence in Clash of Clans, including placing s
 - **Hero Deployment**: Places King, Queen, Grand Warden, Champion, and Siege Machine with location variations
 - **Goblin Deployment**: Places 106 goblins across 29 locations with random deviation
 - **Repeatable**: Can run infinite loop or specified number of attacks
+- **Runtime controls** while the script runs:
+  - **Pause** — **Ctrl+P**, **Ctrl+^** (often Ctrl+Shift+6), or **Ctrl+L**
+  - **Resume** — **Ctrl+S**, **Ctrl+Y**, or **Ctrl+Q** (S/Q are delivered because the script turns off TTY IXON flow control)
+  - **Restart** — **Ctrl+R**, **Ctrl+]**, or **Ctrl+O** (same attack number; mid-battle restart may mis-click unless you are on a sensible screen)
+  - On **Linux/macOS**, keys are read from **`/dev/tty`** (the real terminal) when possible, so hotkeys still work if Python’s **stdin is piped** (e.g. some IDE run configs). TTY flow control is adjusted so **Ctrl+S** works. **pynput** is used automatically when there is **no** TTY listener (and is optional with `COC_ATTACK_PYNPUT=1` when TTY already works, for keys while the game has focus — X11; often not on Wayland). Set **`COC_ATTACK_PYNPUT=0`** to force-disable pynput.
 
 ## Files
 
@@ -25,7 +30,17 @@ This script automates the attack sequence in Clash of Clans, including placing s
 
 ## Usage
 
-### Quick Start
+### TUI (Textual)
+
+```bash
+pip install -r requirements.txt
+python -m coc_tui
+# or: python run_automated_attacks.py --tui
+```
+
+See `cursor_doc/tui.md` for the full flow (device list, Appium connect, live log, stop button).
+
+### Quick Start (CLI)
 
 ```bash
 cd /media/bhupesh-lad/4ab4e02c-4256-44ef-886b-f3bdea9e4880/coc_automator
