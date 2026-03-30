@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/menu_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="56dp"
+        android:background="#E6282830"
+        android:orientation="vertical"
+        android:padding="6dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btn_start"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/overlay_start" />
+
+        <Button
+            android:id="@+id/btn_pause"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/overlay_pause" />
+
+        <Button
+            android:id="@+id/btn_resume"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/overlay_resume" />
+
+        <Button
+            android:id="@+id/btn_restart"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/overlay_restart" />
+
+        <Button
+            android:id="@+id/btn_stop"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/overlay_stop" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/fab_circle"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="end|center_vertical"
+        android:background="@drawable/fab_circle_bg"
+        android:contentDescription="@string/overlay_fab"
+        android:padding="10dp"
+        android:src="@android:drawable/ic_menu_more" />
+
+</FrameLayout>

@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">CoC Automator</string>
+    <string name="main_instructions">Rooted device required for taps. Grant overlay, then start — you will be asked to allow screen capture for OCR (gold/elixir), same regions as the Python script.</string>
+    <string name="hero_count_label">Heroes (1–4)</string>
+    <string name="add_reinforcements">Add reinforcements before each attack</string>
+    <string name="grant_overlay_permission">Open overlay settings</string>
+    <string name="start_screen_capture_and_overlay">Start automation (screen capture)</string>
+    <string name="overlay_start">Start</string>
+    <string name="overlay_pause">Pause</string>
+    <string name="overlay_resume">Resume</string>
+    <string name="overlay_restart">Restart attack</string>
+    <string name="overlay_stop">Stop</string>
+    <string name="overlay_fab">Automation controls</string>
+    <string name="projection_denied">Screen capture cancelled — OCR needs this permission.</string>
+    <string name="overlay_started">Overlay running — open your game and tap the purple circle.</string>
+    <string name="overlay_already_granted">Overlay permission already granted.</string>
+    <string name="need_overlay_first">Allow display over other apps first.</string>
+    <string name="notification_running">Overlay active — tap the circle for controls.</string>
+    <string name="notification_channel_name">Automation</string>
+    <string name="root_failed">Root shell failed — taps will not work.</string>
+    <string name="overlay_paused">Paused</string>
+    <string name="overlay_resumed">Resumed</string>
+    <string name="overlay_restart_toast">Restarting current attack…</string>
+    <string name="overlay_stopped">Automation stopped</string>
+    <string name="already_running">Already running</string>
+    <string name="no_projection">Start automation from the app first to grant screen capture.</string>
+</resources>
