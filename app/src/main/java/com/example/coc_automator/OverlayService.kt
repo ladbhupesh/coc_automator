@@ -37,6 +37,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 
 class OverlayService : Service() {
@@ -57,6 +58,13 @@ class OverlayService : Service() {
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(serviceJob + Dispatchers.Default)
     private var automationJob: Job? = null
+
+    /**
+     * True from accepted Start until the automation coroutine's [finally] runs.
+     * Prevents overlapping runs: after [Job.cancel] the job is no longer [Job.isActive] but the
+     * coroutine can still be executing — a second Start used to slip through if we only checked [isActive].
+     */
+    private val automationOccupied = AtomicBoolean(false)
 
     /** Touch-through status line (top center); null when not shown. */
     private var statusBarView: View? = null
@@ -272,18 +280,20 @@ class OverlayService : Service() {
     }
 
     private fun startAutomationLoop() {
-        if (automationJob?.isActive == true) {
-            DebugLog.d("startAutomationLoop: already running")
+        if (!automationOccupied.compareAndSet(false, true)) {
+            DebugLog.d("startAutomationLoop: blocked — prior run still starting or winding down")
             Toast.makeText(this, R.string.already_running, Toast.LENGTH_SHORT).show()
             return
         }
         // After Stop we keep MediaProjection but clear the virtual display; consent Intent may be nulled only after full teardown.
         if (mediaProjection == null && mediaProjectionData == null) {
+            automationOccupied.set(false)
             DebugLog.w("startAutomationLoop: no MediaProjection and no consent data")
             Toast.makeText(this, R.string.no_projection, Toast.LENGTH_LONG).show()
             return
         }
         if (!hasWorkingRoot()) {
+            automationOccupied.set(false)
             Toast.makeText(this, R.string.root_failed, Toast.LENGTH_LONG).show()
             DebugLog.e("startAutomationLoop: root check failed — grant su to app")
             return
@@ -363,6 +373,7 @@ class OverlayService : Service() {
                 releaseVirtualDisplayOnly()
                 controller.running.set(false)
                 removeStatusBarOverlay()
+                automationOccupied.set(false)
             }
         }
     }
