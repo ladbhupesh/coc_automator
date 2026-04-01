@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/text_automation_status"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/overlay_status_bg"
+    android:ellipsize="end"
+    android:gravity="center"
+    android:maxWidth="300dp"
+    android:maxLines="6"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="8dp"
+    android:textColor="#FFFFFF"
+    android:textSize="12sp" />

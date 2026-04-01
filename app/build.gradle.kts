@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.play.services.mlkit.text.recognition)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.recyclerview)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

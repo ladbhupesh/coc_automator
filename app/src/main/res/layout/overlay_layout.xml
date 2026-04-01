@@ -22,32 +22,18 @@
             android:text="@string/overlay_start" />
 
         <Button
-            android:id="@+id/btn_pause"
-            style="@style/Widget.AppCompat.Button.Small"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="@string/overlay_pause" />
-
-        <Button
-            android:id="@+id/btn_resume"
-            style="@style/Widget.AppCompat.Button.Small"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="@string/overlay_resume" />
-
-        <Button
-            android:id="@+id/btn_restart"
-            style="@style/Widget.AppCompat.Button.Small"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="@string/overlay_restart" />
-
-        <Button
             android:id="@+id/btn_stop"
             style="@style/Widget.AppCompat.Button.Small"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
             android:text="@string/overlay_stop" />
+
+        <Button
+            android:id="@+id/btn_kill_app"
+            style="@style/Widget.AppCompat.Button.Small"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="@string/overlay_kill_app" />
     </LinearLayout>
 
     <ImageView

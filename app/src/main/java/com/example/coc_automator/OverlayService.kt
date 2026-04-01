@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.os.Process
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -25,6 +26,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CancellationException
@@ -56,7 +58,11 @@ class OverlayService : Service() {
     private val serviceScope = CoroutineScope(serviceJob + Dispatchers.Default)
     private var automationJob: Job? = null
 
+    /** Touch-through status line (top center); null when not shown. */
+    private var statusBarView: View? = null
+
     private val controller = AutomationController()
+    private val rootTapSession = RootTapSession()
     private var heroCount = 4
     private var addReinforcements = false
 
@@ -68,6 +74,15 @@ class OverlayService : Service() {
 
         var mediaProjectionData: Intent? = null
         var resultCode: Int = 0
+
+        /**
+         * The screen-capture [mediaProjectionData] is single-use: after [MediaProjection.stop]
+         * (or system revoke), you must obtain a new consent from [MainActivity].
+         */
+        fun invalidateCaptureConsent() {
+            mediaProjectionData = null
+            resultCode = 0
+        }
     }
 
     override fun onCreate() {
@@ -97,40 +112,17 @@ class OverlayService : Service() {
     }
 
     /**
-     * One-shot root tap. Avoids a long-lived `su` shell: without draining stdout/stderr,
-     * the pipe fills and `input` blocks — a common reason no taps reach the game.
+     * Sends tap to the long-lived [rootTapSession] (single interactive `su` for the whole run).
      * Uses full path to `input` for Magisk/sh PATH issues.
      */
     private fun tapRawPixels(x: Int, y: Int) {
-        try {
-            val cmd = "/system/bin/input tap $x $y"
-            DebugLog.d("root: exec su -c \"$cmd\"")
-            val p = ProcessBuilder("su", "-c", cmd)
-                .redirectErrorStream(true)
-                .start()
-            p.inputStream.use { ins ->
-                val buf = ByteArray(512)
-                while (ins.read(buf) != -1) {
-                    // discard su/input chatter
-                }
-            }
-            if (!p.waitFor(2, TimeUnit.SECONDS)) {
-                p.destroyForcibly()
-                DebugLog.w("root: tap TIMEOUT screen=($x,$y)")
-                return
-            }
-            val code = p.exitValue()
-            if (code != 0) {
-                DebugLog.w("root: tap exitCode=$code screen=($x,$y)")
-            } else {
-                DebugLog.d("root: tap OK screen=($x,$y)")
-            }
-        } catch (e: Exception) {
-            DebugLog.e("root: tap exception screen=($x,$y)", e)
-        }
+        rootTapSession.tap(x, y)
     }
 
-    /** Quick root check before automation (Magisk prompt may appear here). */
+    /**
+     * One `su -c id` before automation so we fail fast with a clear toast if root is denied.
+     * All taps then use one interactive `su` via [rootTapSession] (not `su -c` per tap).
+     */
     private fun hasWorkingRoot(): Boolean {
         return try {
             val p = ProcessBuilder("su", "-c", "id")
@@ -217,28 +209,66 @@ class OverlayService : Service() {
             menuLayout.visibility = View.GONE
             startAutomationLoop()
         }
-        overlayView.findViewById<Button>(R.id.btn_pause).setOnClickListener {
-            DebugLog.d("overlay: Pause")
-            controller.paused.set(true)
-            Toast.makeText(this, R.string.overlay_paused, Toast.LENGTH_SHORT).show()
-        }
-        overlayView.findViewById<Button>(R.id.btn_resume).setOnClickListener {
-            DebugLog.d("overlay: Resume")
-            controller.paused.set(false)
-            Toast.makeText(this, R.string.overlay_resumed, Toast.LENGTH_SHORT).show()
-        }
-        overlayView.findViewById<Button>(R.id.btn_restart).setOnClickListener {
-            DebugLog.d("overlay: Restart attack")
-            controller.requestRestart()
-            Toast.makeText(this, R.string.overlay_restart_toast, Toast.LENGTH_SHORT).show()
-        }
         overlayView.findViewById<Button>(R.id.btn_stop).setOnClickListener {
             DebugLog.d("overlay: Stop")
             stopAutomationLoop()
             Toast.makeText(this, R.string.overlay_stopped, Toast.LENGTH_SHORT).show()
         }
+        overlayView.findViewById<Button>(R.id.btn_kill_app).setOnClickListener {
+            DebugLog.d("overlay: Kill app")
+            Toast.makeText(this, R.string.overlay_kill_toast, Toast.LENGTH_SHORT).show()
+            killAutomatorApp()
+        }
 
         windowManager.addView(overlayView, layoutParams)
+    }
+
+    private fun addStatusBarOverlayIfNeeded() {
+        if (statusBarView != null) return
+        val v = LayoutInflater.from(this).inflate(R.layout.overlay_status_bar, null)
+        val p = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = (10 * resources.displayMetrics.density).toInt()
+        }
+        windowManager.addView(v, p)
+        statusBarView = v
+    }
+
+    private fun removeStatusBarOverlay() {
+        statusBarView?.let {
+            try {
+                windowManager.removeView(it)
+            } catch (_: Exception) {
+            }
+        }
+        statusBarView = null
+    }
+
+    private fun setAutomationStatus(line: String) {
+        mainHandler.post {
+            addStatusBarOverlayIfNeeded()
+            statusBarView?.findViewById<TextView>(R.id.text_automation_status)?.text = line
+        }
+    }
+
+    private fun killAutomatorApp() {
+        stopAutomationLoop()
+        removeStatusBarOverlay()
+        if (::overlayView.isInitialized) {
+            try {
+                windowManager.removeView(overlayView)
+            } catch (_: Exception) {
+            }
+        }
+        stopForeground(Service.STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        Process.killProcess(Process.myPid())
     }
 
     private fun startAutomationLoop() {
@@ -247,8 +277,9 @@ class OverlayService : Service() {
             Toast.makeText(this, R.string.already_running, Toast.LENGTH_SHORT).show()
             return
         }
-        if (mediaProjectionData == null) {
-            DebugLog.w("startAutomationLoop: no mediaProjectionData")
+        // After Stop we keep MediaProjection but clear the virtual display; consent Intent may be nulled only after full teardown.
+        if (mediaProjection == null && mediaProjectionData == null) {
+            DebugLog.w("startAutomationLoop: no MediaProjection and no consent data")
             Toast.makeText(this, R.string.no_projection, Toast.LENGTH_LONG).show()
             return
         }
@@ -259,49 +290,79 @@ class OverlayService : Service() {
         }
 
         controller.running.set(true)
-        controller.paused.set(false)
+        setAutomationStatus(getString(R.string.status_starting))
 
         automationJob = serviceScope.launch {
             try {
                 setupMediaProjection()
+                rootTapSession.close()
+                if (!rootTapSession.open()) {
+                    mainHandler.post {
+                        Toast.makeText(this@OverlayService, R.string.root_shell_failed, Toast.LENGTH_LONG).show()
+                    }
+                    DebugLog.e("startAutomationLoop: interactive su failed to start")
+                    return@launch
+                }
                 val metrics = resources.displayMetrics
                 DebugLog.d("display: ${metrics.widthPixels}x${metrics.heightPixels} densityDpi=${metrics.densityDpi}")
                 val geometry = ScreenGeometry(metrics.widthPixels, metrics.heightPixels)
                 DebugLog.d("ScreenGeometry base ${ScreenGeometry.BASE_WIDTH}x${ScreenGeometry.BASE_HEIGHT} (ref resolution)")
-                val attack = CoCAttackAutomation(
-                    geometry = geometry,
-                    tap = { x, y -> tapRawPixels(x, y) },
-                    controller = controller,
-                    captureFullScreen = { captureScreenshot() },
-                )
+                setAutomationStatus(getString(R.string.status_capture_ready))
+
+                val ocrSaver = object : OcrCaptureSaver {
+                    override suspend fun saveGoldElixirCrops(
+                        gold: Bitmap,
+                        elixir: Bitmap,
+                        goldText: String?,
+                        elixirText: String?,
+                    ) {
+                        OcrCaptureStore.saveCapture(
+                            applicationContext,
+                            gold,
+                            elixir,
+                            goldText,
+                            elixirText,
+                        )
+                    }
+                }
 
                 while (isActive && controller.running.get()) {
+                    val coordConfig = AttackCoordinateStore.load(applicationContext)
+                    val postDeployMs = AutomationSettingsStore.postDeployWaitMs(applicationContext)
+                    val attack = CoCAttackAutomation(
+                        geometry = geometry,
+                        tap = { x, y -> tapRawPixels(x, y) },
+                        controller = controller,
+                        captureFullScreen = { captureScreenshot() },
+                        coords = coordConfig,
+                        postDeployWaitMs = postDeployMs,
+                        onStatus = { setAutomationStatus(it) },
+                        ocrCaptureSaver = ocrSaver,
+                    )
                     try {
                         attack.executeAttackSequence(heroCount, addReinforcements)
                         DebugLog.d("main loop: sequence finished, sleep 2s before next attack")
-                    } catch (_: RestartAttackException) {
-                        DebugLog.d("main loop: RestartAttackException -> re-run sequence")
-                        continue
                     } catch (_: CancellationException) {
                         DebugLog.d("main loop: cancelled")
                         break
                     }
                     if (!controller.running.get()) break
+                    setAutomationStatus(getString(R.string.status_next_attack_soon))
                     try {
                         controller.interruptibleSleep(2000)
-                    } catch (_: RestartAttackException) {
-                        DebugLog.d("main loop: restart during inter-attack sleep")
-                        continue
                     } catch (_: CancellationException) {
                         break
                     }
                 }
             } catch (e: Exception) {
                 DebugLog.e("automation coroutine failed", e)
+                setAutomationStatus(getString(R.string.status_error, e.message ?: ""))
             } finally {
-                DebugLog.d("automation: finally releaseCapture + running=false")
-                releaseCapture()
+                DebugLog.d("automation: finally releaseVirtualDisplayOnly + running=false")
+                rootTapSession.close()
+                releaseVirtualDisplayOnly()
                 controller.running.set(false)
+                removeStatusBarOverlay()
             }
         }
     }
@@ -309,10 +370,57 @@ class OverlayService : Service() {
     private fun stopAutomationLoop() {
         DebugLog.d("stopAutomationLoop")
         controller.running.set(false)
-        controller.paused.set(false)
         automationJob?.cancel()
         automationJob = null
-        releaseCapture()
+        rootTapSession.close()
+        releaseVirtualDisplayOnly()
+        removeStatusBarOverlay()
+    }
+
+    /** Tear down capture surface only so [MediaProjection] can be reused after FAB Stop → Start. */
+    private fun releaseVirtualDisplayOnly() {
+        DebugLog.d("releaseVirtualDisplayOnly")
+        virtualDisplay?.release()
+        virtualDisplay = null
+        imageReader?.close()
+        imageReader = null
+    }
+
+    /** Stop projection and clear consent — service destroy, system revoke, or fatal setup error. */
+    private fun releaseCaptureFully() {
+        DebugLog.d("releaseCaptureFully")
+        releaseVirtualDisplayOnly()
+        mediaProjection?.let { mp ->
+            try {
+                projectionCallback?.let { mp.unregisterCallback(it) }
+            } catch (e: Exception) {
+                DebugLog.w("unregister MediaProjection callback", e)
+            }
+            projectionCallback = null
+            try {
+                mp.stop()
+            } catch (e: Exception) {
+                DebugLog.w("MediaProjection.stop", e)
+            }
+        }
+        mediaProjection = null
+        invalidateCaptureConsent()
+    }
+
+    /** System invoked [MediaProjection.Callback.onStop]; projection is already ending — do not call [MediaProjection.stop]. */
+    private fun handleProjectionStoppedByCallback() {
+        DebugLog.d("handleProjectionStoppedByCallback")
+        releaseVirtualDisplayOnly()
+        mediaProjection?.let { mp ->
+            try {
+                projectionCallback?.let { mp.unregisterCallback(it) }
+            } catch (e: Exception) {
+                DebugLog.w("unregister after projection stop", e)
+            }
+        }
+        projectionCallback = null
+        mediaProjection = null
+        invalidateCaptureConsent()
     }
 
     private fun setupMediaProjection() {
@@ -320,29 +428,34 @@ class OverlayService : Service() {
             DebugLog.d("setupMediaProjection: already active, skip")
             return
         }
-        val mpManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        val mp = mpManager.getMediaProjection(resultCode, mediaProjectionData!!)
-        if (mp == null) {
-            DebugLog.e("setupMediaProjection: getMediaProjection returned null")
-            return
-        }
-        mediaProjection = mp
-        DebugLog.d("setupMediaProjection: got MediaProjection")
-
-        // API 34+: must register a callback before createVirtualDisplay.
-        val cb = object : MediaProjection.Callback() {
-            override fun onStop() {
-                DebugLog.w("MediaProjection.Callback.onStop — capture ended (revoked or stopped)")
-                virtualDisplay?.release()
-                virtualDisplay = null
-                imageReader?.close()
-                imageReader = null
-            }
-        }
-        projectionCallback = cb
-        mp.registerCallback(cb, mainHandler)
-
         val metrics = resources.displayMetrics
+
+        val mp = mediaProjection ?: run {
+            val data = mediaProjectionData
+            if (data == null) {
+                DebugLog.e("setupMediaProjection: no mediaProjectionData for new projection")
+                return
+            }
+            val mpManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val newMp = mpManager.getMediaProjection(resultCode, data)
+            if (newMp == null) {
+                DebugLog.e("setupMediaProjection: getMediaProjection returned null")
+                return
+            }
+            mediaProjection = newMp
+            DebugLog.d("setupMediaProjection: new MediaProjection from consent")
+
+            val cb = object : MediaProjection.Callback() {
+                override fun onStop() {
+                    DebugLog.w("MediaProjection.Callback.onStop — revoked or stopped")
+                    mainHandler.post { handleProjectionStoppedByCallback() }
+                }
+            }
+            projectionCallback = cb
+            newMp.registerCallback(cb, mainHandler)
+            newMp
+        }
+
         try {
             imageReader = ImageReader.newInstance(
                 metrics.widthPixels,
@@ -363,7 +476,7 @@ class OverlayService : Service() {
             DebugLog.d("VirtualDisplay created ${metrics.widthPixels}x${metrics.heightPixels}")
         } catch (e: Exception) {
             DebugLog.e("createVirtualDisplay failed", e)
-            releaseCapture()
+            releaseCaptureFully()
             throw e
         }
     }
@@ -395,20 +508,6 @@ class OverlayService : Service() {
             }
         }
 
-    private fun releaseCapture() {
-        DebugLog.d("releaseCapture")
-        virtualDisplay?.release()
-        virtualDisplay = null
-        imageReader?.close()
-        imageReader = null
-        mediaProjection?.let { mp ->
-            projectionCallback?.let { mp.unregisterCallback(it) }
-            projectionCallback = null
-            mp.stop()
-        }
-        mediaProjection = null
-    }
-
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
@@ -424,7 +523,9 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         DebugLog.d("OverlayService.onDestroy")
+        removeStatusBarOverlay()
         stopAutomationLoop()
+        releaseCaptureFully()
         if (::overlayView.isInitialized) {
             try {
                 windowManager.removeView(overlayView)

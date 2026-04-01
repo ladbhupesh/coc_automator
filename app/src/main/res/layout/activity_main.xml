@@ -30,12 +30,41 @@
         android:layout_marginTop="12dp"
         android:text="@string/add_reinforcements" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/post_deploy_wait_label" />
+
+    <EditText
+        android:id="@+id/edit_post_deploy_seconds"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/post_deploy_wait_hint"
+        android:importantForAutofill="no"
+        android:inputType="number"
+        android:maxLength="4" />
+
     <Button
         android:id="@+id/btn_grant_overlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
         android:text="@string/grant_overlay_permission" />
+
+    <Button
+        android:id="@+id/btn_configure_coordinates"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/configure_coordinates" />
+
+    <Button
+        android:id="@+id/btn_ocr_gallery"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/ocr_gallery_open" />
 
     <Button
         android:id="@+id/btn_start_automation"

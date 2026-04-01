@@ -24,6 +24,20 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".CoordinateConfigActivity"
+            android:exported="false"
+            android:label="@string/coord_config_title" />
+
+        <activity
+            android:name=".CoordinatePickerActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".OcrCaptureGalleryActivity"
+            android:exported="false"
+            android:label="@string/ocr_gallery_title" />
+
         <service
             android:name=".OverlayService"
             android:enabled="true"

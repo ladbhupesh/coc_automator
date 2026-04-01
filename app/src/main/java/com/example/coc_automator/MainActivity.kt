@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +21,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var spinnerHeroCount: Spinner
     private lateinit var checkReinforcements: CheckBox
+    private lateinit var editPostDeploySeconds: EditText
 
     private val projectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -47,12 +49,21 @@ class MainActivity : AppCompatActivity() {
         moveTaskToBack(true)
     }
 
+    private fun persistPostDeployWaitSeconds() {
+        val raw = editPostDeploySeconds.text.toString().trim()
+        val sec = raw.toLongOrNull()?.coerceIn(0L, 600L) ?: 30L
+        AutomationSettingsStore.setPostDeployWaitMs(this, sec * 1000L)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         spinnerHeroCount = findViewById(R.id.spinner_hero_count)
         checkReinforcements = findViewById(R.id.check_reinforcements)
+        editPostDeploySeconds = findViewById(R.id.edit_post_deploy_seconds)
+        val savedDeployMs = AutomationSettingsStore.postDeployWaitMs(this)
+        editPostDeploySeconds.setText((savedDeployMs / 1000L).toString())
 
         spinnerHeroCount.adapter = ArrayAdapter(
             this,
@@ -60,6 +71,14 @@ class MainActivity : AppCompatActivity() {
             listOf("1 — King", "2 — King + Queen", "3 — + Warden", "4 — All heroes"),
         )
         spinnerHeroCount.setSelection(3)
+
+        findViewById<Button>(R.id.btn_configure_coordinates).setOnClickListener {
+            startActivity(Intent(this, CoordinateConfigActivity::class.java))
+        }
+
+        findViewById<Button>(R.id.btn_ocr_gallery).setOnClickListener {
+            startActivity(Intent(this, OcrCaptureGalleryActivity::class.java))
+        }
 
         findViewById<Button>(R.id.btn_grant_overlay).setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
@@ -79,6 +98,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.need_overlay_first, Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
+            persistPostDeployWaitSeconds()
             val mpManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             projectionLauncher.launch(mpManager.createScreenCaptureIntent())
         }

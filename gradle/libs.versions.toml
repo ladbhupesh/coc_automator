@@ -11,8 +11,10 @@ constraintlayout = "2.1.4"
 lifecycleRuntimeKtx = "2.7.0"
 playServicesMlkitTextRecognition = "19.0.0"
 coroutines = "1.7.3"
+recyclerview = "1.3.2"
 
 [libraries]
+androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

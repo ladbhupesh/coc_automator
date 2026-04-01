@@ -14,9 +14,16 @@ class CoCAttackAutomation(
     private val tap: (Int, Int) -> Unit,
     private val controller: AutomationController,
     private val captureFullScreen: suspend () -> Bitmap?,
+    private val coords: AttackCoordinateConfig = AttackCoordinateConfig.default(),
+    /** Wait after troop deployment before End battle (chunked sleeps). */
+    private val postDeployWaitMs: Long = 30_000L,
     private val resourceThreshold: Long = 500_000L,
     private val maxSearchAttempts: Int = 10,
+    private val onStatus: (String) -> Unit = {},
+    private val ocrCaptureSaver: OcrCaptureSaver? = null,
 ) {
+
+    private fun status(msg: String) = onStatus(msg)
 
     private fun bx(x: Int) = geometry.x(x)
     private fun by(y: Int) = geometry.y(y)
@@ -56,30 +63,32 @@ class CoCAttackAutomation(
     )
 
     private fun calculateCardPositions(heroCount: Int): CardPositions {
-        val cardWidth = 134
-        val cardGap = 20
+        val c = coords.cardBar
+        val cardWidth = c.cardWidth
+        val cardGap = c.cardGap
         val missingHeroes = 4 - heroCount.coerceIn(1, 4)
         val shift = if (missingHeroes > 0) missingHeroes * (cardWidth + cardGap) else 0
         return CardPositions(
-            goblin = 447,
-            siege = 734,
-            king = 900,
-            queen = 1053,
-            warden = 1219,
-            champion = 1363,
-            jumpSpell = 1500 - shift,
-            quakeSpell = 1644 - shift,
+            goblin = c.goblin,
+            siege = c.siege,
+            king = c.king,
+            queen = c.queen,
+            warden = c.warden,
+            champion = c.champion,
+            jumpSpell = c.jumpSpellBase - shift,
+            quakeSpell = c.quakeSpellBase - shift,
         )
     }
 
     private suspend fun placeJumpSpell(heroCount: Int) {
+        status("Jump spell…")
         DebugLog.d("phase: placeJumpSpell (heroes=$heroCount)")
         val pos = calculateCardPositions(heroCount)
         val deviation = Random.nextInt(5, 7)
         val selectX = pos.jumpSpell + Random.nextInt(-deviation, deviation + 1)
-        tapAt(selectX, 978)
+        tapAt(selectX, coords.jumpSpellSelectY)
         controller.interruptibleSleep(100)
-        val locs = listOf(800 to 250, 1565 to 250, 1572 to 706)
+        val locs = coords.jumpPlacements
         for ((lx, ly) in locs) {
             tapWithDeviation(lx, ly, deviation = Random.nextInt(2, 4))
             controller.interruptibleSleep(50)
@@ -87,26 +96,22 @@ class CoCAttackAutomation(
     }
 
     private suspend fun placeQuakeSpells(heroCount: Int) {
+        status("Quake spells…")
         DebugLog.d("phase: placeQuakeSpells (heroes=$heroCount)")
         val pos = calculateCardPositions(heroCount)
         val deviation = Random.nextInt(5, 7)
         val selectX = pos.quakeSpell + Random.nextInt(-deviation, deviation + 1)
-        tapAt(selectX, 997)
+        tapAt(selectX, coords.quakeSpellSelectY)
         controller.interruptibleSleep(100)
+        val (qx, qy) = coords.quakeSpamPoint
         repeat(5) {
-            tapWithDeviation(1353, 444, deviation = Random.nextInt(2, 4))
+            tapWithDeviation(qx, qy, deviation = Random.nextInt(2, 4))
             controller.interruptibleSleep(50)
         }
     }
 
-    private val heroConfigs = listOf(
-        "king" to (2263 to 469),
-        "queen" to (2281 to 466),
-        "warden" to (2256 to 456),
-        "champion" to (2284 to 459),
-    )
-
     private suspend fun placeHeroesInSequence(heroCount: Int) {
+        status("Deploying heroes…")
         DebugLog.d("phase: placeHeroesInSequence count=$heroCount")
         val pos = calculateCardPositions(heroCount)
         val positionsByKey = mapOf(
@@ -115,15 +120,16 @@ class CoCAttackAutomation(
             "warden" to pos.warden,
             "champion" to pos.champion,
         )
+        val heroKeys = listOf("king", "queen", "warden", "champion")
         for (i in 0 until heroCount.coerceIn(1, 4)) {
-            val (key, place) = heroConfigs[i]
+            val key = heroKeys[i]
             DebugLog.d("hero: $key")
             val centerX = positionsByKey.getValue(key)
             val deviation = Random.nextInt(5, 7)
             val selectX = centerX + Random.nextInt(-deviation, deviation + 1)
-            tapAt(selectX, 969)
+            tapAt(selectX, coords.heroSelectY)
             controller.interruptibleSleep(100)
-            val (px, py) = place
+            val (px, py) = coords.heroPlacements[i]
             val numPlacements = Random.nextInt(2, 4)
             repeat(numPlacements) { j ->
                 val offsetX = Random.nextInt(-3, 4) * (j + 1)
@@ -132,20 +138,21 @@ class CoCAttackAutomation(
                 controller.interruptibleSleep(30)
             }
             controller.interruptibleSleep(50)
-            tapAt(100, 100)
+            val (dx, dy) = coords.dismissTap
+            tapAt(dx, dy)
             controller.interruptibleSleep(50)
         }
     }
 
     private suspend fun placeSiegeMachine() {
+        status("Siege machine…")
         DebugLog.d("phase: placeSiegeMachine")
         val pos = calculateCardPositions(4)
         val deviation = Random.nextInt(5, 7)
         val selectX = pos.siege + Random.nextInt(-deviation, deviation + 1)
-        tapAt(selectX, 978)
+        tapAt(selectX, coords.siegeSelectY)
         controller.interruptibleSleep(100)
-        val baseX = 2272
-        val baseY = 491
+        val (baseX, baseY) = coords.siegePlacement
         val numPlacements = Random.nextInt(2, 4)
         repeat(numPlacements) { i ->
             val offsetX = Random.nextInt(-3, 4) * (i + 1)
@@ -154,26 +161,20 @@ class CoCAttackAutomation(
             controller.interruptibleSleep(30)
         }
         controller.interruptibleSleep(50)
-        tapAt(100, 100)
+        val (dx, dy) = coords.dismissTap
+        tapAt(dx, dy)
         controller.interruptibleSleep(50)
     }
 
-    private val goblinLocations = listOf(
-        509 to 738, 438 to 684, 372 to 619, 313 to 578, 216 to 469,
-        375 to 347, 481 to 256, 538 to 216, 619 to 166, 691 to 125,
-        803 to 63, 1706 to 844, 1766 to 816, 1847 to 794, 1906 to 753,
-        1963 to 713, 2022 to 669, 2075 to 638, 2141 to 575, 2197 to 531,
-        2259 to 466, 2200 to 413, 2169 to 384, 2100 to 334, 2003 to 275,
-        1866 to 194, 1806 to 153, 1681 to 75, 1641 to 50,
-    )
-
     private suspend fun placeGoblins(count: Int = 106) {
+        status("Deploying goblins…")
         DebugLog.d("phase: placeGoblins count=$count")
         val pos = calculateCardPositions(4)
         val deviation = Random.nextInt(5, 7)
         val selectX = pos.goblin + Random.nextInt(-deviation, deviation + 1)
-        tapAt(selectX, 966)
+        tapAt(selectX, coords.goblinSelectY)
         controller.interruptibleSleep(50)
+        val goblinLocations = coords.goblinPlacements
         val n = goblinLocations.size
         val perLoc = count / n
         val remainder = count % n
@@ -191,92 +192,113 @@ class CoCAttackAutomation(
     }
 
     private suspend fun clickAttack() {
+        status("Tap: Attack")
         DebugLog.d("UI: Attack button")
-        tapAt(228, 944)
+        val (x, y) = coords.uiAttack
+        tapAt(x, y)
         controller.interruptibleSleep(500)
     }
 
     private suspend fun clickFindMatch() {
+        status("Tap: Find match")
         DebugLog.d("UI: Find Match")
-        tapAt(431, 809)
+        val (x, y) = coords.uiFindMatch
+        tapAt(x, y)
         controller.interruptibleSleep(500)
     }
 
     private suspend fun clickAddReinforcements() {
+        status("Tap: Add reinforcements")
         DebugLog.d("UI: Add Reinforcements")
-        tapAt(1870, 875)
+        val (x, y) = coords.uiAddReinforcements
+        tapAt(x, y)
         controller.interruptibleSleep(500)
     }
 
     private suspend fun clickConfirmReinforcements() {
+        status("Tap: Confirm reinforcements")
         DebugLog.d("UI: Confirm Reinforcements")
-        tapAt(1440, 800)
+        val (x, y) = coords.uiConfirmReinforcements
+        tapAt(x, y)
         controller.interruptibleSleep(500)
     }
 
     /** "Attack!" on plan screen — from adb_record_taps.py: screen (103,1986) → base (223,894). */
     private suspend fun clickStartAttack() {
+        status("Tap: Start attack")
         DebugLog.d("UI: Start Attack")
-        tapAt(223, 894)
+        val (x, y) = coords.uiStartAttack
+        tapAt(x, y)
         controller.interruptibleSleep(500)
     }
 
     private suspend fun clickNextButton() {
+        status("Tap: Next base (skip)")
         DebugLog.d("UI: Next (skip base)")
-        tapWithDeviation(2150, 750, deviation = 50)
+        val (x, y) = coords.uiNext
+        tapWithDeviation(x, y, deviation = 50)
         controller.interruptibleSleep(2000)
     }
 
     private suspend fun clickEndBattle() {
+        status("Tap: End battle")
         DebugLog.d("UI: End Battle")
-        tapWithDeviation(187, 800, deviation = 50)
+        val (x, y) = coords.uiEndBattle
+        tapWithDeviation(x, y, deviation = 50)
         controller.interruptibleSleep(1000)
     }
 
     private suspend fun clickConfirm() {
+        status("Tap: Confirm")
         DebugLog.d("UI: Confirm")
-        tapWithDeviation(1350, 700, deviation = 50)
+        val (x, y) = coords.uiConfirm
+        tapWithDeviation(x, y, deviation = 50)
         controller.interruptibleSleep(2000)
     }
 
     private suspend fun clickReturnHome() {
+        status("Tap: Return home")
         DebugLog.d("UI: Return Home")
-        tapAt(1253, 916)
+        val (x, y) = coords.uiReturnHome
+        tapAt(x, y)
         controller.interruptibleSleep(1000)
     }
 
     private suspend fun extractResourcesFromScreenshot(full: Bitmap): Pair<String?, String?> {
-        val gl = geometry.cropLeft(165)
-        val gt = geometry.cropTop(145)
-        val gw = geometry.cropWidth(165, 380)
-        val gh = geometry.cropHeight(145, 200)
-        DebugLog.d("OCR crop gold: ($gl,$gt)+${gw}x${gh} on frame ${full.width}x${full.height}")
-        val goldBmp = Bitmap.createBitmap(full, gl, gt, gw, gh)
-
-        val el = geometry.cropLeft(165)
-        val et = geometry.cropTop(200)
-        val ew = geometry.cropWidth(165, 380)
-        val eh = geometry.cropHeight(200, 250)
-        DebugLog.d("OCR crop elixir: ($el,$et)+${ew}x${eh}")
-        val elixirBmp = Bitmap.createBitmap(full, el, et, ew, eh)
-
+        status("OCR: reading gold & elixir…")
+        val goldBmp = cropForOcr(full, coords.goldOcrRect, "gold")
+        val elixirBmp = cropForOcr(full, coords.elixirOcrRect, "elixir")
         return try {
-            bitmapToGoldElixirStrings(goldBmp, elixirBmp)
+            val (g, e) = bitmapToGoldElixirStrings(goldBmp, elixirBmp)
+            ocrCaptureSaver?.saveGoldElixirCrops(goldBmp, elixirBmp, g, e)
+            status("OCR · Gold: ${g ?: "—"} · Elixir: ${e ?: "—"}")
+            g to e
         } finally {
             if (!goldBmp.isRecycled) goldBmp.recycle()
             if (!elixirBmp.isRecycled) elixirBmp.recycle()
         }
     }
 
+    private fun cropForOcr(full: Bitmap, rect: OcrCropRect, label: String): Bitmap {
+        val gl = geometry.cropLeft(rect.left).coerceIn(0, full.width - 1)
+        val gt = geometry.cropTop(rect.top).coerceIn(0, full.height - 1)
+        val gw = geometry.cropWidth(rect.left, rect.right).coerceAtLeast(1).coerceAtMost(full.width - gl)
+        val gh = geometry.cropHeight(rect.top, rect.bottom).coerceAtLeast(1).coerceAtMost(full.height - gt)
+        DebugLog.d("OCR crop $label: ($gl,$gt)+${gw}x${gh} base=${rect.toLogString()} frame=${full.width}x${full.height}")
+        return Bitmap.createBitmap(full, gl, gt, gw, gh)
+    }
+
     /**
      * @return true if a full attack finished; false if skipped (max searches)
      */
     suspend fun executeAttackSequence(heroCount: Int, addReinforcements: Boolean): Boolean {
+        status("Starting attack sequence…")
         DebugLog.d("======== Attack sequence START heroes=$heroCount reinforce=$addReinforcements threshold=$resourceThreshold ========")
         var searchAttempts = 0
         while (searchAttempts < maxSearchAttempts) {
             searchAttempts++
             controller.attackTick()
+            status("Search attempt $searchAttempts / $maxSearchAttempts")
             DebugLog.d("--- Search attempt $searchAttempts / $maxSearchAttempts ---")
 
             if (searchAttempts == 1) {
@@ -290,14 +312,17 @@ class CoCAttackAutomation(
             }
 
             if (searchAttempts == 1) {
+                status("Waiting 10s before OCR…")
                 DebugLog.d("wait 10s before first OCR")
                 controller.interruptibleSleep(10_000)
             } else {
+                status("Waiting 5s before OCR…")
                 DebugLog.d("wait 5s before OCR")
                 controller.interruptibleSleep(5_000)
             }
 
             val full = captureFullScreen() ?: run {
+                status("Screenshot failed — aborting")
                 DebugLog.w("captureFullScreen returned null — abort sequence")
                 return false
             }
@@ -315,6 +340,7 @@ class CoCAttackAutomation(
 
             if (!shouldAttack) {
                 if (searchAttempts < maxSearchAttempts) {
+                    status("Below threshold · skipping base")
                     DebugLog.d("below threshold -> Next")
                     clickNextButton()
                     controller.interruptibleSleep(3000)
@@ -324,6 +350,7 @@ class CoCAttackAutomation(
                 return false
             }
 
+            status("Threshold OK · deploying troops")
             DebugLog.d("threshold OK -> troop placement")
             placeJumpSpell(heroCount)
             controller.interruptibleSleep(100)
@@ -331,26 +358,34 @@ class CoCAttackAutomation(
             controller.interruptibleSleep(100)
             placeHeroesInSequence(heroCount)
             controller.interruptibleSleep(100)
-            tapAt(100, 100)
+            val (dx, dy) = coords.dismissTap
+            tapAt(dx, dy)
             controller.interruptibleSleep(50)
             placeSiegeMachine()
             controller.interruptibleSleep(100)
             placeGoblins(106)
             controller.interruptibleSleep(100)
 
-            DebugLog.d("wait 30s after deployments (chunked)")
-            var elapsed = 0
-            while (elapsed < 30_000) {
-                val step = minOf(10_000, 30_000 - elapsed)
-                controller.interruptibleSleep(step.toLong())
+            status("Waiting after deployment (${postDeployWaitMs / 1000}s)…")
+            DebugLog.d("wait after deployments (chunked) total=${postDeployWaitMs}ms")
+            var elapsed = 0L
+            while (elapsed < postDeployWaitMs) {
+                val step = minOf(10_000L, postDeployWaitMs - elapsed)
+                controller.interruptibleSleep(step)
                 elapsed += step
-                DebugLog.d("post-deploy wait elapsed=${elapsed}ms / 30000ms")
+                status("Waiting after deployment… ${elapsed / 1000}s / ${postDeployWaitMs / 1000}s")
+                DebugLog.d("post-deploy wait elapsed=${elapsed}ms / ${postDeployWaitMs}ms")
             }
 
             clickEndBattle()
             clickConfirm()
             controller.interruptibleSleep(2000)
             clickReturnHome()
+            val postHomeMs = Random.nextLong(10_000L, 15_001L)
+            status("Waiting ${postHomeMs / 1000}s after Return home…")
+            DebugLog.d("post Return Home wait ${postHomeMs}ms (random 10–15s)")
+            controller.interruptibleSleep(postHomeMs)
+            status("Attack finished · idle until next loop")
             DebugLog.d("======== Attack sequence END success ========")
             return true
         }
