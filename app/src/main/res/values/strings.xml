@@ -5,6 +5,8 @@
     <string name="add_reinforcements">Add reinforcements before each attack</string>
     <string name="post_deploy_wait_label">Wait after deployments (seconds)</string>
     <string name="post_deploy_wait_hint">Default 30 — chunked into 10s steps (interruptible on Stop)</string>
+    <string name="inter_tap_delay_label">Delay after each tap (milliseconds)</string>
+    <string name="inter_tap_delay_hint">Default 180 — 0 disables; max 3000</string>
     <string name="grant_overlay_permission">Open overlay settings</string>
     <string name="start_screen_capture_and_overlay">Start automation (screen capture)</string>
     <string name="overlay_start">Start</string>

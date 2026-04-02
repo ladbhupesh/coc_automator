@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var spinnerHeroCount: Spinner
     private lateinit var checkReinforcements: CheckBox
     private lateinit var editPostDeploySeconds: EditText
+    private lateinit var editInterTapDelayMs: EditText
 
     private val projectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -55,6 +56,12 @@ class MainActivity : AppCompatActivity() {
         AutomationSettingsStore.setPostDeployWaitMs(this, sec * 1000L)
     }
 
+    private fun persistInterTapDelayMs() {
+        val raw = editInterTapDelayMs.text.toString().trim()
+        val ms = raw.toLongOrNull()?.coerceIn(0L, 3000L) ?: 180L
+        AutomationSettingsStore.setInterTapDelayMs(this, ms)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -62,8 +69,10 @@ class MainActivity : AppCompatActivity() {
         spinnerHeroCount = findViewById(R.id.spinner_hero_count)
         checkReinforcements = findViewById(R.id.check_reinforcements)
         editPostDeploySeconds = findViewById(R.id.edit_post_deploy_seconds)
+        editInterTapDelayMs = findViewById(R.id.edit_inter_tap_delay_ms)
         val savedDeployMs = AutomationSettingsStore.postDeployWaitMs(this)
         editPostDeploySeconds.setText((savedDeployMs / 1000L).toString())
+        editInterTapDelayMs.setText(AutomationSettingsStore.interTapDelayMs(this).toString())
 
         spinnerHeroCount.adapter = ArrayAdapter(
             this,
@@ -99,6 +108,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             persistPostDeployWaitSeconds()
+            persistInterTapDelayMs()
             val mpManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             projectionLauncher.launch(mpManager.createScreenCaptureIntent())
         }

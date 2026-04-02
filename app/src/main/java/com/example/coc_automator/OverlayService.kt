@@ -339,6 +339,7 @@ class OverlayService : Service() {
                 while (isActive && controller.running.get()) {
                     val coordConfig = AttackCoordinateStore.load(applicationContext)
                     val postDeployMs = AutomationSettingsStore.postDeployWaitMs(applicationContext)
+                    val interTapMs = AutomationSettingsStore.interTapDelayMs(applicationContext)
                     val attack = CoCAttackAutomation(
                         geometry = geometry,
                         tap = { x, y -> tapRawPixels(x, y) },
@@ -346,6 +347,7 @@ class OverlayService : Service() {
                         captureFullScreen = { captureScreenshot() },
                         coords = coordConfig,
                         postDeployWaitMs = postDeployMs,
+                        interTapDelayMs = interTapMs,
                         onStatus = { setAutomationStatus(it) },
                         ocrCaptureSaver = ocrSaver,
                     )

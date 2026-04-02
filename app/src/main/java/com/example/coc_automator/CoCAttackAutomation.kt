@@ -17,6 +17,8 @@ class CoCAttackAutomation(
     private val coords: AttackCoordinateConfig = AttackCoordinateConfig.default(),
     /** Wait after troop deployment before End battle (chunked sleeps). */
     private val postDeployWaitMs: Long = 30_000L,
+    /** Wait after each tap before the next (game input pacing). */
+    private val interTapDelayMs: Long = 180L,
     private val resourceThreshold: Long = 500_000L,
     private val maxSearchAttempts: Int = 10,
     private val onStatus: (String) -> Unit = {},
@@ -24,6 +26,10 @@ class CoCAttackAutomation(
 ) {
 
     private fun status(msg: String) = onStatus(msg)
+
+    private suspend fun pauseAfterTap() {
+        if (interTapDelayMs > 0) controller.interruptibleSleep(interTapDelayMs)
+    }
 
     private fun bx(x: Int) = geometry.x(x)
     private fun by(y: Int) = geometry.y(y)
@@ -34,6 +40,7 @@ class CoCAttackAutomation(
         val sy = by(baseY)
         DebugLog.d("tapAt base=($baseX,$baseY) -> screen=($sx,$sy)")
         tap(sx, sy)
+        pauseAfterTap()
     }
 
     private suspend fun tapWithDeviation(
@@ -49,6 +56,7 @@ class CoCAttackAutomation(
         val sy = by(y)
         DebugLog.d("tapDev base=($baseX,$baseY)->($x,$y) screen=($sx,$sy) dev=$deviation")
         tap(sx, sy)
+        pauseAfterTap()
     }
 
     private data class CardPositions(
