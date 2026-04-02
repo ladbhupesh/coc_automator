@@ -12,6 +12,10 @@
     <string name="overlay_start">Start</string>
     <string name="overlay_stop">Stop</string>
     <string name="overlay_kill_app">Kill app</string>
+    <string name="overlay_debug_tap_dots">Debug: show tap dot</string>
+    <string name="overlay_debug_tap_dots_short">Dot</string>
+    <string name="toast_debug_dots_on">Tap dots ON — red markers on each injection</string>
+    <string name="toast_debug_dots_off">Tap dots OFF</string>
     <string name="overlay_kill_toast">Closing CoC Automator…</string>
     <string name="overlay_fab">Automation controls</string>
     <string name="projection_denied">Screen capture cancelled — OCR needs this permission.</string>

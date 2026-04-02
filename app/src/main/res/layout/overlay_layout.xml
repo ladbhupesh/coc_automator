@@ -1,17 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
 
+    <!-- Opens to the left of the switch + FAB -->
     <LinearLayout
         android:id="@+id/menu_layout"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="end|center_vertical"
-        android:layout_marginEnd="56dp"
-        android:background="#E6282830"
+        android:layout_marginEnd="8dp"
+        android:background="#DD383838"
         android:orientation="vertical"
-        android:padding="6dp"
+        android:padding="8dp"
         android:visibility="gone">
 
         <Button
@@ -36,14 +40,29 @@
             android:text="@string/overlay_kill_app" />
     </LinearLayout>
 
+    <!-- Always visible — was inside hidden menu before -->
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switch_debug_tap_dots"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp"
+        android:checked="false"
+        android:minHeight="48dp"
+        android:text="@string/overlay_debug_tap_dots_short"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        app:showText="false"
+        app:thumbTint="#FFFFFF"
+        app:trackTint="#99FFFFFF"
+        tools:ignore="SmallSp" />
+
     <ImageView
         android:id="@+id/fab_circle"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_gravity="end|center_vertical"
         android:background="@drawable/fab_circle_bg"
         android:contentDescription="@string/overlay_fab"
         android:padding="10dp"
         android:src="@android:drawable/ic_menu_more" />
 
-</FrameLayout>
+</LinearLayout>

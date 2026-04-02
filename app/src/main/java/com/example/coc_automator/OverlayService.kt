@@ -17,6 +17,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -28,7 +29,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +74,13 @@ class OverlayService : Service() {
 
     private val controller = AutomationController()
     private val rootTapSession = RootTapSession()
+
+    /** When true, each [tapRawPixels] shows a short-lived red dot at the injection point (debug). */
+    private val showTapDebugDots = AtomicBoolean(false)
+
+    private val debugDotViews = ArrayList<View>()
+    /** Long enough to notice during fast tap sequences. */
+    private val debugDotDismissMs = 1200L
     private var heroCount = 4
     private var addReinforcements = false
 
@@ -125,6 +135,86 @@ class OverlayService : Service() {
      */
     private fun tapRawPixels(x: Int, y: Int) {
         rootTapSession.tap(x, y)
+        if (showTapDebugDots.get()) {
+            postDebugTapDot(screenX = x, screenY = y)
+        }
+    }
+
+    private fun postDebugTapDot(screenX: Int, screenY: Int) {
+        mainHandler.post { showDebugTapDotAt(screenX, screenY) }
+    }
+
+    /**
+     * Red ~15dp-radius marker at [screenX],[screenY]; touch-through; auto-removed after [debugDotDismissMs].
+     */
+    private fun showDebugTapDotAt(screenX: Int, screenY: Int) {
+        if (!showTapDebugDots.get()) return
+        val dm = resources.displayMetrics
+        val size = (38f * dm.density).toInt().coerceIn(28, 120)
+        val half = size / 2
+        val dot = View(this).apply {
+            background = ContextCompat.getDrawable(this@OverlayService, R.drawable.tap_debug_dot)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                elevation = 32f
+                translationZ = 32f
+            }
+        }
+        val lp = WindowManager.LayoutParams(
+            size,
+            size,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = (screenX - half).coerceIn(0, (dm.widthPixels - size).coerceAtLeast(0))
+            y = (screenY - half).coerceIn(0, (dm.heightPixels - size).coerceAtLeast(0))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        try {
+            windowManager.addView(dot, lp)
+            synchronized(debugDotViews) { debugDotViews.add(dot) }
+            Log.i(DebugLog.TAG, "debug tap dot at screen=($screenX,$screenY) size=$size (toggle ON)")
+            DebugLog.d("debug dot at screen=($screenX,$screenY) size=$size")
+        } catch (e: Exception) {
+            Log.e(DebugLog.TAG, "debug tap dot add failed", e)
+            DebugLog.w("debug tap dot add failed", e)
+            return
+        }
+        mainHandler.postDelayed(
+            {
+                try {
+                    windowManager.removeView(dot)
+                } catch (_: Exception) {
+                }
+                synchronized(debugDotViews) { debugDotViews.remove(dot) }
+            },
+            debugDotDismissMs,
+        )
+    }
+
+    private fun removeAllDebugTapDots() {
+        val action = {
+            synchronized(debugDotViews) {
+                for (v in debugDotViews.toList()) {
+                    try {
+                        windowManager.removeView(v)
+                    } catch (_: Exception) {
+                    }
+                }
+                debugDotViews.clear()
+            }
+        }
+        if (Looper.myLooper() == mainHandler.looper) {
+            action()
+        } else {
+            mainHandler.post(action)
+        }
     }
 
     /**
@@ -228,6 +318,19 @@ class OverlayService : Service() {
             killAutomatorApp()
         }
 
+        overlayView.findViewById<SwitchCompat>(R.id.switch_debug_tap_dots)?.setOnCheckedChangeListener { _, checked ->
+            showTapDebugDots.set(checked)
+            if (!checked) {
+                removeAllDebugTapDots()
+            }
+            Log.i(DebugLog.TAG, "Debug tap dots ${if (checked) "ON" else "OFF"}")
+            Toast.makeText(
+                this,
+                if (checked) getString(R.string.toast_debug_dots_on) else getString(R.string.toast_debug_dots_off),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+
         windowManager.addView(overlayView, layoutParams)
     }
 
@@ -268,6 +371,7 @@ class OverlayService : Service() {
     private fun killAutomatorApp() {
         stopAutomationLoop()
         removeStatusBarOverlay()
+        removeAllDebugTapDots()
         if (::overlayView.isInitialized) {
             try {
                 windowManager.removeView(overlayView)
@@ -536,6 +640,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         DebugLog.d("OverlayService.onDestroy")
+        removeAllDebugTapDots()
         removeStatusBarOverlay()
         stopAutomationLoop()
         releaseCaptureFully()
