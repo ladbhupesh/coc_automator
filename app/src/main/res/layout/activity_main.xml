@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:fillViewport="true"
+    android:clipToPadding="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:paddingBottom="32dp">
 
     <TextView
         android:layout_width="wrap_content"
@@ -60,6 +67,66 @@
         android:inputType="number"
         android:maxLength="4" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/deviation_placement_label" />
+
+    <EditText
+        android:id="@+id/edit_deviation_placement_max"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/deviation_placement_hint"
+        android:importantForAutofill="no"
+        android:inputType="number"
+        android:maxLength="3" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/deviation_bar_label" />
+
+    <EditText
+        android:id="@+id/edit_deviation_bar_max"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/deviation_bar_hint"
+        android:importantForAutofill="no"
+        android:inputType="number"
+        android:maxLength="3" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/deviation_goblin_label" />
+
+    <EditText
+        android:id="@+id/edit_deviation_goblin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/deviation_goblin_hint"
+        android:importantForAutofill="no"
+        android:inputType="number"
+        android:maxLength="3" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/deviation_ui_wide_label" />
+
+    <EditText
+        android:id="@+id/edit_deviation_ui_wide"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/deviation_ui_wide_hint"
+        android:importantForAutofill="no"
+        android:inputType="number"
+        android:maxLength="3" />
+
     <Button
         android:id="@+id/btn_grant_overlay"
         android:layout_width="match_parent"
@@ -88,4 +155,5 @@
         android:layout_marginTop="8dp"
         android:text="@string/start_screen_capture_and_overlay" />
 
-</LinearLayout>
+    </LinearLayout>
+</ScrollView>

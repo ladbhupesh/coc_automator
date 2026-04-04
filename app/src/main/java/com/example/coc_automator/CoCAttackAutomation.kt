@@ -19,6 +19,13 @@ class CoCAttackAutomation(
     private val postDeployWaitMs: Long = 30_000L,
     /** Wait after each tap before the next (game input pacing). */
     private val interTapDelayMs: Long = 180L,
+    /** Board placements: each tap uses deviation in Random.nextInt(2, this+1) (base px). */
+    private val placementDeviationMax: Int = 3,
+    /** Bottom bar card pick: horizontal jitter Random.nextInt(5, this+1). */
+    private val barSelectDeviationMax: Int = 6,
+    private val goblinTapDeviation: Int = 2,
+    /** Next / End battle / Confirm. */
+    private val uiWideTapDeviation: Int = 50,
     private val resourceThreshold: Long = 500_000L,
     private val maxSearchAttempts: Int = 10,
     private val onStatus: (String) -> Unit = {},
@@ -29,6 +36,16 @@ class CoCAttackAutomation(
 
     private suspend fun pauseAfterTap() {
         if (interTapDelayMs > 0) controller.interruptibleSleep(interTapDelayMs)
+    }
+
+    private fun randomPlacementDeviation(): Int {
+        val max = placementDeviationMax.coerceIn(2, 25)
+        return Random.nextInt(2, max + 1)
+    }
+
+    private fun randomBarSelectDeviation(): Int {
+        val max = barSelectDeviationMax.coerceIn(5, 40)
+        return Random.nextInt(5, max + 1)
     }
 
     private fun bx(x: Int) = geometry.x(x)
@@ -92,13 +109,13 @@ class CoCAttackAutomation(
         status("Jump spell…")
         DebugLog.d("phase: placeJumpSpell (heroes=$heroCount)")
         val pos = calculateCardPositions(heroCount)
-        val deviation = Random.nextInt(5, 7)
+        val deviation = randomBarSelectDeviation()
         val selectX = pos.jumpSpell + Random.nextInt(-deviation, deviation + 1)
         tapAt(selectX, coords.jumpSpellSelectY)
         controller.interruptibleSleep(100)
         val locs = coords.jumpPlacements
         for ((lx, ly) in locs) {
-            tapWithDeviation(lx, ly, deviation = Random.nextInt(2, 4))
+            tapWithDeviation(lx, ly, deviation = randomPlacementDeviation())
             controller.interruptibleSleep(50)
         }
     }
@@ -107,13 +124,13 @@ class CoCAttackAutomation(
         status("Quake spells…")
         DebugLog.d("phase: placeQuakeSpells (heroes=$heroCount)")
         val pos = calculateCardPositions(heroCount)
-        val deviation = Random.nextInt(5, 7)
+        val deviation = randomBarSelectDeviation()
         val selectX = pos.quakeSpell + Random.nextInt(-deviation, deviation + 1)
         tapAt(selectX, coords.quakeSpellSelectY)
         controller.interruptibleSleep(100)
         val (qx, qy) = coords.quakeSpamPoint
         repeat(5) {
-            tapWithDeviation(qx, qy, deviation = Random.nextInt(2, 4))
+            tapWithDeviation(qx, qy, deviation = randomPlacementDeviation())
             controller.interruptibleSleep(50)
         }
     }
@@ -133,7 +150,7 @@ class CoCAttackAutomation(
             val key = heroKeys[i]
             DebugLog.d("hero: $key")
             val centerX = positionsByKey.getValue(key)
-            val deviation = Random.nextInt(5, 7)
+            val deviation = randomBarSelectDeviation()
             val selectX = centerX + Random.nextInt(-deviation, deviation + 1)
             tapAt(selectX, coords.heroSelectY)
             controller.interruptibleSleep(100)
@@ -142,7 +159,7 @@ class CoCAttackAutomation(
             repeat(numPlacements) { j ->
                 val offsetX = Random.nextInt(-3, 4) * (j + 1)
                 val offsetY = Random.nextInt(-3, 4) * (j + 1)
-                tapWithDeviation(px + offsetX, py + offsetY, deviation = Random.nextInt(2, 4))
+                tapWithDeviation(px + offsetX, py + offsetY, deviation = randomPlacementDeviation())
                 controller.interruptibleSleep(30)
             }
             controller.interruptibleSleep(50)
@@ -156,7 +173,7 @@ class CoCAttackAutomation(
         status("Siege machine…")
         DebugLog.d("phase: placeSiegeMachine")
         val pos = calculateCardPositions(4)
-        val deviation = Random.nextInt(5, 7)
+        val deviation = randomBarSelectDeviation()
         val selectX = pos.siege + Random.nextInt(-deviation, deviation + 1)
         tapAt(selectX, coords.siegeSelectY)
         controller.interruptibleSleep(100)
@@ -165,7 +182,7 @@ class CoCAttackAutomation(
         repeat(numPlacements) { i ->
             val offsetX = Random.nextInt(-3, 4) * (i + 1)
             val offsetY = Random.nextInt(-3, 4) * (i + 1)
-            tapWithDeviation(baseX + offsetX, baseY + offsetY, deviation = Random.nextInt(2, 4))
+            tapWithDeviation(baseX + offsetX, baseY + offsetY, deviation = randomPlacementDeviation())
             controller.interruptibleSleep(30)
         }
         controller.interruptibleSleep(50)
@@ -178,7 +195,7 @@ class CoCAttackAutomation(
         status("Deploying goblins…")
         DebugLog.d("phase: placeGoblins count=$count")
         val pos = calculateCardPositions(4)
-        val deviation = Random.nextInt(5, 7)
+        val deviation = randomBarSelectDeviation()
         val selectX = pos.goblin + Random.nextInt(-deviation, deviation + 1)
         tapAt(selectX, coords.goblinSelectY)
         controller.interruptibleSleep(50)
@@ -194,7 +211,7 @@ class CoCAttackAutomation(
                 index++
                 val (lx, ly) = goblinLocations[i]
                 DebugLog.d("goblin tap #$index loc=($lx,$ly) bucket=$i")
-                tapWithDeviation(lx, ly, deviation = 2)
+                tapWithDeviation(lx, ly, deviation = goblinTapDeviation.coerceIn(1, 25))
             }
         }
     }
@@ -244,7 +261,7 @@ class CoCAttackAutomation(
         status("Tap: Next base (skip)")
         DebugLog.d("UI: Next (skip base)")
         val (x, y) = coords.uiNext
-        tapWithDeviation(x, y, deviation = 50)
+        tapWithDeviation(x, y, deviation = uiWideTapDeviation.coerceIn(10, 300))
         controller.interruptibleSleep(2000)
     }
 
@@ -252,7 +269,7 @@ class CoCAttackAutomation(
         status("Tap: End battle")
         DebugLog.d("UI: End Battle")
         val (x, y) = coords.uiEndBattle
-        tapWithDeviation(x, y, deviation = 50)
+        tapWithDeviation(x, y, deviation = uiWideTapDeviation.coerceIn(10, 300))
         controller.interruptibleSleep(1000)
     }
 
@@ -260,7 +277,7 @@ class CoCAttackAutomation(
         status("Tap: Confirm")
         DebugLog.d("UI: Confirm")
         val (x, y) = coords.uiConfirm
-        tapWithDeviation(x, y, deviation = 50)
+        tapWithDeviation(x, y, deviation = uiWideTapDeviation.coerceIn(10, 300))
         controller.interruptibleSleep(2000)
     }
 
@@ -389,7 +406,7 @@ class CoCAttackAutomation(
             clickConfirm()
             controller.interruptibleSleep(2000)
             clickReturnHome()
-            val postHomeMs = Random.nextLong(10_000L, 15_001L)
+                    val postHomeMs = Random.nextLong(10_000L, 15_001L)
             status("Waiting ${postHomeMs / 1000}s after Return home…")
             DebugLog.d("post Return Home wait ${postHomeMs}ms (random 10–15s)")
             controller.interruptibleSleep(postHomeMs)

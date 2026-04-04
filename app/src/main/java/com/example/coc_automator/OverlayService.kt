@@ -444,6 +444,10 @@ class OverlayService : Service() {
                     val coordConfig = AttackCoordinateStore.load(applicationContext)
                     val postDeployMs = AutomationSettingsStore.postDeployWaitMs(applicationContext)
                     val interTapMs = AutomationSettingsStore.interTapDelayMs(applicationContext)
+                    val placementDev = AutomationSettingsStore.placementDeviationMax(applicationContext)
+                    val barDev = AutomationSettingsStore.barSelectDeviationMax(applicationContext)
+                    val goblinDev = AutomationSettingsStore.goblinDeviation(applicationContext)
+                    val uiWideDev = AutomationSettingsStore.uiWideDeviation(applicationContext)
                     val attack = CoCAttackAutomation(
                         geometry = geometry,
                         tap = { x, y -> tapRawPixels(x, y) },
@@ -452,6 +456,10 @@ class OverlayService : Service() {
                         coords = coordConfig,
                         postDeployWaitMs = postDeployMs,
                         interTapDelayMs = interTapMs,
+                        placementDeviationMax = placementDev,
+                        barSelectDeviationMax = barDev,
+                        goblinTapDeviation = goblinDev,
+                        uiWideTapDeviation = uiWideDev,
                         onStatus = { setAutomationStatus(it) },
                         ocrCaptureSaver = ocrSaver,
                     )

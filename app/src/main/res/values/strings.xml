@@ -7,6 +7,14 @@
     <string name="post_deploy_wait_hint">Default 30 — chunked into 10s steps (interruptible on Stop)</string>
     <string name="inter_tap_delay_label">Delay after each tap (milliseconds)</string>
     <string name="inter_tap_delay_hint">Default 180 — 0 disables; max 3000</string>
+    <string name="deviation_placement_label">Placement deviation max (base px)</string>
+    <string name="deviation_placement_hint">2–25, default 3 — random 2…max on spells/heroes/siege</string>
+    <string name="deviation_bar_label">Card bar X jitter max (base px)</string>
+    <string name="deviation_bar_hint">5–40, default 6 — random 5…max when picking troops/spells</string>
+    <string name="deviation_goblin_label">Goblin tap deviation (base px)</string>
+    <string name="deviation_goblin_hint">1–25, default 2</string>
+    <string name="deviation_ui_wide_label">Big UI taps deviation (Next / End / Confirm, px)</string>
+    <string name="deviation_ui_wide_hint">10–300, default 50</string>
     <string name="grant_overlay_permission">Open overlay settings</string>
     <string name="start_screen_capture_and_overlay">Start automation (screen capture)</string>
     <string name="overlay_start">Start</string>

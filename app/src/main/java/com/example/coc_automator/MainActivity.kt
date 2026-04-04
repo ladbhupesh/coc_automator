@@ -23,6 +23,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkReinforcements: CheckBox
     private lateinit var editPostDeploySeconds: EditText
     private lateinit var editInterTapDelayMs: EditText
+    private lateinit var editDeviationPlacementMax: EditText
+    private lateinit var editDeviationBarMax: EditText
+    private lateinit var editDeviationGoblin: EditText
+    private lateinit var editDeviationUiWide: EditText
 
     private val projectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -62,6 +66,17 @@ class MainActivity : AppCompatActivity() {
         AutomationSettingsStore.setInterTapDelayMs(this, ms)
     }
 
+    private fun persistDeviationSettings() {
+        val p = editDeviationPlacementMax.text.toString().trim().toIntOrNull() ?: 3
+        AutomationSettingsStore.setPlacementDeviationMax(this, p)
+        val b = editDeviationBarMax.text.toString().trim().toIntOrNull() ?: 6
+        AutomationSettingsStore.setBarSelectDeviationMax(this, b)
+        val g = editDeviationGoblin.text.toString().trim().toIntOrNull() ?: 2
+        AutomationSettingsStore.setGoblinDeviation(this, g)
+        val u = editDeviationUiWide.text.toString().trim().toIntOrNull() ?: 50
+        AutomationSettingsStore.setUiWideDeviation(this, u)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -70,9 +85,17 @@ class MainActivity : AppCompatActivity() {
         checkReinforcements = findViewById(R.id.check_reinforcements)
         editPostDeploySeconds = findViewById(R.id.edit_post_deploy_seconds)
         editInterTapDelayMs = findViewById(R.id.edit_inter_tap_delay_ms)
+        editDeviationPlacementMax = findViewById(R.id.edit_deviation_placement_max)
+        editDeviationBarMax = findViewById(R.id.edit_deviation_bar_max)
+        editDeviationGoblin = findViewById(R.id.edit_deviation_goblin)
+        editDeviationUiWide = findViewById(R.id.edit_deviation_ui_wide)
         val savedDeployMs = AutomationSettingsStore.postDeployWaitMs(this)
         editPostDeploySeconds.setText((savedDeployMs / 1000L).toString())
         editInterTapDelayMs.setText(AutomationSettingsStore.interTapDelayMs(this).toString())
+        editDeviationPlacementMax.setText(AutomationSettingsStore.placementDeviationMax(this).toString())
+        editDeviationBarMax.setText(AutomationSettingsStore.barSelectDeviationMax(this).toString())
+        editDeviationGoblin.setText(AutomationSettingsStore.goblinDeviation(this).toString())
+        editDeviationUiWide.setText(AutomationSettingsStore.uiWideDeviation(this).toString())
 
         spinnerHeroCount.adapter = ArrayAdapter(
             this,
@@ -109,6 +132,7 @@ class MainActivity : AppCompatActivity() {
             }
             persistPostDeployWaitSeconds()
             persistInterTapDelayMs()
+            persistDeviationSettings()
             val mpManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             projectionLauncher.launch(mpManager.createScreenCaptureIntent())
         }
